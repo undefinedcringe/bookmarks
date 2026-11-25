@@ -5,12 +5,32 @@
 
 # Database dumps made by scripts/backup.sh
 backups/
+*.dump
+*.dump.partial
 
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
 .venv/
+venv/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+build/
+dist/
+
+# Docker Compose local overrides
+compose.override.yaml
+
+# Editors and OS files
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
 
 # Local editor/tool caches
 .impeccable/
