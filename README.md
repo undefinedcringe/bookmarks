@@ -27,12 +27,6 @@ a real Postgres.
 |---|---|
 | ![Screenshot: the app in dark mode](docs/images/dark-mode.png) | ![Screenshot: Swagger UI listing the API endpoints](docs/images/api-docs.png) |
 
-<!-- PLACEHOLDER: record docs/images/demo.gif (add a bookmark with tags, click a tag to filter, delete it) -->
-![Demo GIF: add a bookmark, filter by its tag, delete it](docs/images/demo.gif)
-
-<!-- PLACEHOLDER: screenshot of a terminal running `docker compose ps` with both services "(healthy)" -->
-![Screenshot: docker compose ps with both services healthy](docs/images/compose-healthy.png)
-
 ## Tech stack
 
 - **Python 3.12:** the whole app is about 400 lines.

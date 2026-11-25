@@ -237,4 +237,5 @@ tests/test_app.py
 docs/images/         screenshots used in the README
 docs/DEPLOYMENT.md    this file
 Dockerfile, compose.yaml, .env.example
+UNLICENSE            public-domain dedication
 ```
