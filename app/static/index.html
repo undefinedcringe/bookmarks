@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bookmarks</title>
+<style>
+  :root { color-scheme: light dark; --fg:#1d1d1f; --muted:#6b6b70; --bg:#fafaf9; --card:#fff; --line:#e4e4e2; --accent:#2f6f4f; --on-accent:#fff; --danger:#a33; }
+  @media (prefers-color-scheme: dark) { :root { --fg:#ececec; --muted:#9a9aa0; --bg:#161617; --card:#1f1f21; --line:#333336; --accent:#6fbf94; --on-accent:#0d1f15; --danger:#e07070; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--fg); background:var(--bg); }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 20px 64px; }
+  h1 { font-size: 22px; margin: 0 0 20px; }
+  form, .bar { display:grid; gap:8px; }
+  #add { grid-template-columns: 1fr 1fr; background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; }
+  #add .wide { grid-column: 1 / -1; }
+  input, button { font:inherit; color:inherit; padding:8px 10px; border-radius:7px; border:1px solid var(--line); background:var(--bg); }
+  button { cursor:pointer; background:var(--accent); border-color:var(--accent); color:var(--on-accent); font-weight:600; }
+  button.link { background:none; border:none; color:var(--muted); padding:2px 4px; font-weight:400; }
+  button.link:hover { color:var(--danger); }
+  .bar { grid-template-columns: 1fr auto; margin:24px 0 10px; }
+  #tags { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
+  .tag { font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); background:var(--card); color:var(--muted); cursor:pointer; font-weight:400; }
+  .tag.on { background:var(--accent); border-color:var(--accent); color:var(--on-accent); }
+  ul { list-style:none; padding:0; margin:0; }
+  li { border-bottom:1px solid var(--line); padding:12px 2px; display:grid; grid-template-columns:1fr auto; gap:4px 12px; }
+  li a { color:var(--fg); font-weight:600; text-decoration:none; word-break:break-word; }
+  li a:hover { text-decoration:underline; }
+  .url { color:var(--muted); font-size:13px; word-break:break-all; }
+  .desc { grid-column:1 / -1; font-size:14px; }
+  .meta { grid-column:1 / -1; display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  #msg { min-height:1.5em; font-size:14px; color:var(--danger); margin-top:8px; }
+  .empty { color:var(--muted); padding:24px 0; display:block; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Bookmarks</h1>
+
+  <form id="add" autocomplete="off">
+    <input class="wide" name="url" type="url" placeholder="https://example.com" required aria-label="URL">
+    <input name="title" placeholder="Title (optional)" aria-label="Title">
+    <input name="tags" placeholder="Tags, comma separated" aria-label="Tags">
+    <input class="wide" name="description" placeholder="Note (optional)" aria-label="Description">
+    <button class="wide" type="submit">Add bookmark</button>
+  </form>
+  <div id="msg" role="status"></div>
+
+  <form class="bar" id="search" role="search">
+    <input name="q" type="search" placeholder="Search title, URL or note" aria-label="Search">
+    <button type="submit">Search</button>
+  </form>
+  <div id="tags"></div>
+  <ul id="list"></ul>
+</main>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const initial = new URLSearchParams(location.search);
+const state = { q: initial.get("q") || "", tag: initial.get("tag") || "" };
+document.querySelector('#search [name="q"]').value = state.q;
+
+// All user data is inserted via textContent / properties, never innerHTML.
+function el(tag, props = {}, ...children) {
+  const node = Object.assign(document.createElement(tag), props);
+  node.append(...children);
+  return node;
+}
+
+async function api(path, options = {}) {
+  const res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...options });
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      const body = await res.json();
+      detail = typeof body.detail === "string" ? body.detail : body.detail.map(d => d.msg).join("; ");
+    } catch {}
+    throw new Error(detail);
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+function showError(err) { $("#msg").textContent = err ? String(err.message || err) : ""; }
+
+function tagButton(label, value, on) {
+  const b = el("button", { type: "button", className: "tag" + (on ? " on" : ""), textContent: label });
+  b.onclick = () => { state.tag = state.tag === value ? "" : value; refresh(); };
+  return b;
+}
+
+async function loadTags() {
+  const tags = await api("/api/tags");
+  $("#tags").replaceChildren(...tags.map(t => tagButton(`${t.tag} · ${t.count}`, t.tag, state.tag === t.tag)));
+}
+
+async function loadList() {
+  const params = new URLSearchParams();
+  if (state.q) params.set("q", state.q);
+  if (state.tag) params.set("tag", state.tag);
+  const items = await api("/api/bookmarks?" + params);
+  const list = $("#list");
+  if (!items.length) {
+    list.replaceChildren(el("li", { className: "empty", textContent: state.q || state.tag ? "No matches." : "No bookmarks yet." }));
+    return;
+  }
+  list.replaceChildren(...items.map(b => {
+    const del = el("button", { type: "button", className: "link", textContent: "Delete", title: "Delete bookmark" });
+    del.onclick = async () => {
+      if (!confirm(`Delete "${b.title || b.url}"?`)) return;
+      try { await api(`/api/bookmarks/${b.id}`, { method: "DELETE" }); refresh(); } catch (e) { showError(e); }
+    };
+    const meta = el("div", { className: "meta" },
+      ...b.tags.map(t => tagButton(t, t, state.tag === t)),
+      el("span", { className: "url", textContent: new Date(b.created_at).toLocaleDateString() }));
+    return el("li", {},
+      el("div", {},
+        el("a", { href: b.url, target: "_blank", rel: "noopener noreferrer", textContent: b.title || b.url }),
+        el("div", { className: "url", textContent: b.url })),
+      del,
+      ...(b.description ? [el("div", { className: "desc", textContent: b.description })] : []),
+      meta);
+  }));
+}
+
+// Keep the current search/tag in the address bar so filtered views can be bookmarked.
+function syncUrl() {
+  const params = new URLSearchParams();
+  if (state.q) params.set("q", state.q);
+  if (state.tag) params.set("tag", state.tag);
+  const qs = params.toString();
+  history.replaceState(null, "", qs ? "?" + qs : location.pathname);
+}
+
+async function refresh() {
+  syncUrl();
+  try { await Promise.all([loadTags(), loadList()]); } catch (e) { showError(e); }
+}
+
+$("#add").onsubmit = async (ev) => {
+  ev.preventDefault();
+  const f = new FormData(ev.target);
+  const body = {
+    url: f.get("url").trim(),
+    title: f.get("title").trim(),
+    description: f.get("description").trim(),
+    tags: f.get("tags").split(",").map(t => t.trim()).filter(Boolean),
+  };
+  try {
+    await api("/api/bookmarks", { method: "POST", body: JSON.stringify(body) });
+    ev.target.reset();
+    showError("");
+    refresh();
+  } catch (e) { showError(e); }
+};
+
+$("#search").onsubmit = (ev) => { ev.preventDefault(); state.q = new FormData(ev.target).get("q").trim(); refresh(); };
+
+refresh();
+</script>
+</body>
+</html>
