@@ -17,6 +17,7 @@ variable has a safe default in `.env.example`.
 | `APP_PORT` | no | `8080` | Host port for the UI/API. |
 | `LOG_LEVEL` | no | `info` | `critical`, `error`, `warning`, `info` or `debug`. |
 | `DB_POOL_SIZE` | no | `5` | Maximum DB connections the app keeps open. |
+| `ALLOWED_HOSTS` | no | *(empty)* | Extra host names the app answers to, comma separated, e.g. `bookmarks.example.com,192.168.1.20`. `localhost` and `127.0.0.1` always work. Any other `Host` header gets a 400, which blocks DNS rebinding. `*` turns the check off. |
 
 If a required variable is missing, it fails fast at two levels:
 
@@ -155,7 +156,8 @@ The app has **no authentication**, which is why it binds to `127.0.0.1` by defau
 To reach it from other machines, put a reverse proxy in front that terminates TLS
 and adds authentication (basic auth, or forward-auth such as Authelia,
 oauth2-proxy or Authentik). Then leave `APP_BIND_ADDRESS=127.0.0.1` so the
-proxy is the only way in.
+proxy is the only way in. Add the proxy's domain to `.env`, for example
+`ALLOWED_HOSTS=bookmarks.example.com`, so the app accepts the forwarded `Host` header.
 
 Caddy example (gets TLS certificates automatically):
 
@@ -201,6 +203,7 @@ its own (sub)domain rather than a sub-path.
 | App keeps restarting, logs say `password authentication failed for user` | `POSTGRES_PASSWORD`/`POSTGRES_USER` were changed after the first start. Postgres only reads them when it creates the volume. | Put the old values back, **or** change the password inside the DB: `docker compose exec db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "ALTER USER \"$POSTGRES_USER\" PASSWORD '\''new-password'\''"'` and then update `.env`. On a fresh install with no data, `docker compose down -v` also works. |
 | `app` stuck in `health: starting` or `unhealthy` | DB not reachable or still initialising | `docker compose logs db app`; `docker compose ps` shows whether `db` is healthy |
 | `dependency failed to start: container bookmarks-db-1 is unhealthy` | Postgres failed to start, often from a corrupt or incompatible volume (e.g. switching major versions) | `docker compose logs db`. For a major-version change, follow the [upgrade steps](#upgrade). |
+| `{"detail":"host not allowed; add it to ALLOWED_HOSTS"}` (HTTP 400) | You opened the app by a name or IP other than `localhost`/`127.0.0.1` | Add that name or IP to `ALLOWED_HOSTS` in `.env`, then `docker compose up -d` |
 | UI loads but can't be reached from another machine | Bound to `127.0.0.1` by default | Use a reverse proxy (recommended), or set `APP_BIND_ADDRESS=0.0.0.0` on a trusted network |
 | Data disappeared after restart | `docker compose down -v` was used, or the project folder (and so the project/volume name) was renamed | `docker volume ls`: the old volume is `<old-folder-name>_pgdata` unless removed. The project name is pinned to `bookmarks` in `compose.yaml` to avoid this. |
 | `restore.sh`: `pg_restore: error: input file does not appear to be a valid archive` | The file isn't a `pg_dump -Fc` dump (e.g. an empty or partial file) | Use a `.dump` file produced by `backup.sh`; check its size is not 0 |

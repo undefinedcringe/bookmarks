@@ -37,6 +37,7 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required - copy .env.example to .env}
       DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-}
     ports:
       - "${APP_BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-8080}:8000"
     networks:

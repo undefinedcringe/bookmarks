@@ -36,7 +36,7 @@ a real Postgres.
 ## Tech stack
 
 - **Python 3.12:** the whole app is about 400 lines.
-- **FastAPI 0.115 + Uvicorn:** HTTP routes and the server; FastAPI also generates the interactive API docs at `/docs`.
+- **FastAPI 0.165 + Uvicorn:** HTTP routes and the server; FastAPI also generates the interactive API docs at `/docs`.
 - **Pydantic 2:** validates request bodies and returns a 422 for non-`http(s)` URLs or malformed tags.
 - **psycopg 3 + psycopg-pool:** PostgreSQL driver and connection pool. The binary wheel bundles libpq, so the image needs no compiler, and the pool reconnects on its own after a database restart.
 - **PostgreSQL 16:** storage. Tags are a `text[]` column with a GIN index, so no join table is needed.

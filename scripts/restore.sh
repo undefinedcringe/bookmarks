@@ -25,7 +25,12 @@ docker compose stop app
 docker compose up -d --wait db
 
 echo "Restoring $file ..."
-docker compose exec -T db sh -c 'pg_restore --clean --if-exists --no-owner --single-transaction -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < "$file"
+if ! docker compose exec -T db sh -c 'pg_restore --clean --if-exists --no-owner --single-transaction -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < "$file"; then
+  # --single-transaction rolled everything back, so the old data is intact.
+  echo "Restore FAILED; the database was left unchanged. Restarting app..." >&2
+  docker compose up -d --wait app
+  exit 1
+fi
 
 echo "Starting app..."
 docker compose up -d --wait app

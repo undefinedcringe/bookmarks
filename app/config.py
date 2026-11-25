@@ -24,6 +24,8 @@ class Settings:
     db_password: str
     db_pool_size: int
     log_level: str
+    # Extra Host header values to accept besides localhost/127.0.0.1; ("*",) disables the check.
+    allowed_hosts: tuple[str, ...] = ()
 
 
 def _int(env: dict, name: str, default: int, minimum: int, errors: list) -> int:
@@ -51,6 +53,11 @@ def load_settings(env: dict | None = None) -> Settings:
     db_port = _int(env, "DB_PORT", 5432, 1, errors)
     pool_size = _int(env, "DB_POOL_SIZE", 5, 1, errors)
 
+    allowed_hosts = tuple(h.strip().lower() for h in env.get("ALLOWED_HOSTS", "").split(",") if h.strip())
+    bad_hosts = [h for h in allowed_hosts if "/" in h or " " in h]
+    if bad_hosts:
+        errors.append(f"ALLOWED_HOSTS must be comma-separated host names without scheme or path, got {', '.join(bad_hosts)}")
+
     if errors:
         raise ConfigError(
             "Invalid configuration:\n  - " + "\n  - ".join(errors)
@@ -65,4 +72,5 @@ def load_settings(env: dict | None = None) -> Settings:
         db_password=env["DB_PASSWORD"],
         db_pool_size=pool_size,
         log_level=log_level,
+        allowed_hosts=allowed_hosts,
     )
